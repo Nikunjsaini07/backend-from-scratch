@@ -104,6 +104,20 @@ func DecodeOne(data []byte) (any , int , error){
 
 }
 
+func DecodeArrayString(data []byte ) ([]string , error){
+	 value , err := Decode(data )
+	 if(err != nil){
+		 return nil , err 
+	 }
+	 ts := value.([]any)
+	 tokens := make([]string , len(ts))
+	 for i := range tokens {
+		 tokens[i] = ts[i].(string)
+	 }
+
+	 return tokens , nil 
+}
+
 
 func Decode(data []byte) (any , error){
 	if len(data) == 0 {
