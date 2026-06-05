@@ -1,6 +1,9 @@
 package protocols
  
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 func readLength(data [] byte ) (int , int ){
 	 length  := 0  
@@ -125,4 +128,16 @@ func Decode(data []byte) (any , error){
 	}
 	value , _, err := DecodeOne(data)
 	return value , err 
+}
+
+func Encode(value any  , isSimple bool) []byte {
+	 switch v := value.(type){
+	 case string :
+		if isSimple {
+			return []byte(fmt.Sprintf("+%s\r\n" , v))
+		}
+
+	    return []byte(fmt.Sprintf("$%d\r\n%s\r\n" , len(v) , v ))
+	 }
+	 return []byte{}
 }
