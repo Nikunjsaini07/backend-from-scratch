@@ -113,6 +113,11 @@ func DecodeArrayString(data []byte ) ([]string , error){
 		 return nil , err 
 	 }
 	 ts := value.([]any)
+	 
+	 ts, ok := value.([]any)
+	 if !ok {
+		return nil, errors.New("RESP value is not an array")
+	 }
 	 tokens := make([]string , len(ts))
 	 for i := range tokens {
 		 tokens[i] = ts[i].(string)
