@@ -7,25 +7,30 @@ import (
 	"io"
 	"log"
 	"net"
-	"strings"
-
 	"redis-demo/internals/commands"
+	"redis-demo/internals/db"
 	"redis-demo/internals/protocols"
+	"strings"
 )
 
 type Server struct {
 	addr     string
 	listener net.Listener
+	db       *db.DB
 	registry map[string]commands.Command
 }
 
-func NewServer(addr string) *Server {
+func NewServer(addr string, database *db.DB) *Server {
 	s := &Server{
 		addr:     addr,
+		db:       database,
 		registry: make(map[string]commands.Command),
 	}
-	
+
 	s.registry["PING"] = &commands.PingCommand{}
+	s.registry["SET"] = &commands.SetCommand{DB: s.db}
+	s.registry["GET"] = &commands.GetCommand{DB: s.db}
+	s.registry["TTL"] = &commands.TtlCommand{DB: s.db}
 
 	return s
 }
@@ -62,7 +67,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		cmd, err := s.readCommand(reader)
 		if err != nil {
 			if err == io.EOF {
-				return 
+				return
 			}
 			s.respondError(err, conn)
 			return
@@ -73,7 +78,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func (s *Server) readCommand(reader *bufio.Reader) (*commands.RedisCmd, error) {
-	
+
 	line, err := reader.ReadBytes('\n')
 	if err != nil {
 		return nil, err
@@ -83,25 +88,21 @@ func (s *Server) readCommand(reader *bufio.Reader) (*commands.RedisCmd, error) {
 		return nil, errors.New("ERR protocol error: expected array start '*'")
 	}
 
-	
 	fullData := append([]byte{}, line...)
-	
 
 	count := 0
 	for i := 1; i < len(line) && line[i] != '\r'; i++ {
 		count = count*10 + int(line[i]-'0')
 	}
 
-	
 	for i := 0; i < count; i++ {
-		
+
 		lenLine, err := reader.ReadBytes('\n')
 		if err != nil {
 			return nil, err
 		}
 		fullData = append(fullData, lenLine...)
 
-		
 		strLen := 0
 		for j := 1; j < len(lenLine) && lenLine[j] != '\r'; j++ {
 			strLen = strLen*10 + int(lenLine[j]-'0')
@@ -115,7 +116,6 @@ func (s *Server) readCommand(reader *bufio.Reader) (*commands.RedisCmd, error) {
 		fullData = append(fullData, payload...)
 	}
 
-	
 	tokens, err := protocols.DecodeArrayString(fullData)
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (s *Server) readCommand(reader *bufio.Reader) (*commands.RedisCmd, error) {
 }
 
 func (s *Server) respond(cmd *commands.RedisCmd, conn net.Conn) {
-	
+
 	executor, ok := s.registry[cmd.Cmd]
 	if !ok {
 		s.respondError(errors.New("ERR unknown command"), conn)
