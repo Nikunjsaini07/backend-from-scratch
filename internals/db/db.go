@@ -43,18 +43,24 @@ type DB struct {
 	data        map[string]string
 	expiresAt   map[string]time.Time
 	expiryQueue expiryHeap
+	maxKeys     int
 }
 
-func NewDB() *DB {
+func NewDB(maxKeys int) *DB {
 	return &DB{
 		data:      make(map[string]string),
 		expiresAt: make(map[string]time.Time),
+		maxKeys:   maxKeys,
 	}
 }
 
 func (d *DB) Set(key string, value string, ttl time.Duration) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
+	if d.maxKeys > 0 && len(d.data) >= d.maxKeys {
+		d.evict()
+	}
 
 	if ttl > 0 {
 		expiresAt := time.Now().Add(ttl)
@@ -197,4 +203,19 @@ func (d *DB) TTL(key string) int64 {
 
 	remaining := time.Until(expiresAt).Seconds()
 	return int64(remaining)
+}
+
+func (d *DB) evict() {
+	for d.expiryQueue.Len() > 0 {
+		next := heap.Pop(&d.expiryQueue).(expiryItem)
+
+		currentExpiry, hasExpiry := d.expiresAt[next.key]
+		if !hasExpiry || !currentExpiry.Equal(next.expiresAt) {
+			continue
+		}
+
+		delete(d.data, next.key)
+		delete(d.expiresAt, next.key)
+		return
+	}
 }
