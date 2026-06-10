@@ -31,6 +31,8 @@ func NewServer(addr string, database *db.DB) *Server {
 	s.registry["SET"] = &commands.SetCommand{DB: s.db}
 	s.registry["GET"] = &commands.GetCommand{DB: s.db}
 	s.registry["TTL"] = &commands.TtlCommand{DB: s.db}
+	s.registry["DEL"] = &commands.DelCommand{DB: s.db}
+	s.registry["EXPIRE"] = &commands.ExpireCommand{DB: s.db}
 
 	return s
 }
